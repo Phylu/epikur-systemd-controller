@@ -1,0 +1,13 @@
+# epikur-systemd-controller Python dependencies
+#
+# Install with:
+#   pip install -r requirements.txt
+
+# Web framework
+Flask>=3.0,<4.0
+
+# WSGI server for production use (replaces Flask's built-in dev server)
+gunicorn>=22.0,<24.0
+
+# Loads configuration from a .env file into os.environ
+python-dotenv>=1.0,<2.0

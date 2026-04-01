@@ -1,0 +1,59 @@
+# /etc/systemd/system/epikur-systemd-controller.service
+#
+# Systemd unit file for the epikur-systemd-controller Gunicorn server.
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/
+#   2. Adjust the paths below to match your installation directory.
+#   3. Run:
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now epikur-systemd-controller.service
+
+[Unit]
+Description=Epikur Systemd Controller — Flask/Gunicorn web dashboard
+# Require the network stack to be up before starting.
+After=network.target
+
+[Service]
+# Run as www-data so the sudoers rule in sudoers.d/epikur applies.
+User=www-data
+Group=www-data
+
+# Absolute path to your project directory (adjust as needed).
+WorkingDirectory=/opt/epikur-systemd-controller
+
+# Load the .env file with EnvironmentFile so secrets never appear in
+# `ps` output or the unit file itself.
+EnvironmentFile=/opt/epikur-systemd-controller/.env
+
+# -------------------------------------------------------------------
+# Bind address — choose ONE of the two options below:
+#
+#   127.0.0.1:5000  (recommended)
+#     Gunicorn only accepts connections from localhost.
+#     Use this when a reverse proxy (e.g. Nginx) sits in front.
+#     The proxy handles TLS and, optionally, HTTP Basic Auth.
+#
+#   0.0.0.0:5000  (direct access, internal networks only)
+#     Gunicorn listens on all interfaces.
+#     Use this ONLY on an isolated, firewalled internal network
+#     where you fully trust every device that can reach this port.
+#     NEVER expose this directly to the public internet.
+# -------------------------------------------------------------------
+ExecStart=/opt/epikur-systemd-controller/venv/bin/gunicorn \
+    --workers 2 \
+    --bind 127.0.0.1:5000 \
+    app:app
+
+# Restart the service automatically if it crashes.
+Restart=on-failure
+RestartSec=5s
+
+# Harden the service:
+# Prevent the process from gaining new privileges via setuid/setgid.
+NoNewPrivileges=true
+# Give the process a private /tmp so it cannot pollute the system temp dir.
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,47 @@
+# /etc/sudoers.d/epikur
+#
+# PURPOSE
+# -------
+# Allows the www-data user (under which Gunicorn runs) to execute
+# ONLY the two systemctl commands needed by epikur-systemd-controller,
+# without a password prompt.
+#
+# INSTALLATION
+# ------------
+# 1. Copy this file to /etc/sudoers.d/epikur
+# 2. Set strict permissions (required by sudo):
+#      sudo chmod 0440 /etc/sudoers.d/epikur
+# 3. Validate the syntax before activating:
+#      sudo visudo -c -f /etc/sudoers.d/epikur
+#
+# SECURITY NOTES
+# --------------
+# * Only the listed services are permitted.  Add one line per service.
+# * NOPASSWD is required because Gunicorn runs non-interactively.
+# * The commands are specified with full paths (/bin/systemctl) to
+#   prevent PATH-hijacking attacks.
+# * Never use a wildcard (ALL) for the command — that would allow
+#   www-data to start/stop any service on the system.
+#
+# Syntax:
+#   <user>  ALL=(root) NOPASSWD: <full-path-to-command> <fixed-arguments>
+#
+# Adjust the service name(s) to match your ALLOWED_SERVICES .env value.
+#
+# NOTE ON systemctl PATH
+# ----------------------
+# On Debian/Ubuntu the binary lives at /usr/bin/systemctl.
+# On some older or minimal systems it may be /bin/systemctl.
+# Run `which systemctl` on your target host to confirm, then update the
+# paths below accordingly.  Using the wrong path will cause sudo to deny
+# the command even though the rule appears to match.
+
+# Allow status checks for epikur.service
+www-data  ALL=(root) NOPASSWD: /usr/bin/systemctl is-active epikur.service
+
+# Allow restart for epikur.service
+www-data  ALL=(root) NOPASSWD: /usr/bin/systemctl restart epikur.service
+
+# If you manage additional services, add pairs of lines for each, e.g.:
+# www-data  ALL=(root) NOPASSWD: /usr/bin/systemctl is-active nginx.service
+# www-data  ALL=(root) NOPASSWD: /usr/bin/systemctl restart nginx.service
