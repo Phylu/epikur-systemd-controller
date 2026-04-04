@@ -121,7 +121,37 @@ sudo cp -r . /opt/epikur-systemd-controller/
 sudo chown -R www-data:www-data /opt/epikur-systemd-controller
 ```
 
-### 6. Install and start the systemd service
+### 6. Install and start the systemd services
+
+#### Epikur Java application (`epikur.service`)
+
+`epikur.service` starts the Epikur JAR directly via the Java binary so that
+systemd can track the PID natively and capture all output in the journal.
+
+```bash
+# Create the dedicated service account (once):
+sudo useradd --system --no-create-home --shell /bin/false epikur
+# (/bin/false is portable; use /usr/sbin/nologin or /usr/bin/nologin where preferred)
+
+# Deploy the application files and set ownership:
+sudo mkdir -p /opt/epikur
+sudo cp /path/to/epikur.jar /opt/epikur/epikur.jar
+sudo chown -R epikur:epikur /opt/epikur
+
+# Install and enable the service:
+sudo cp epikur.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now epikur.service
+
+# Verify it is running and follow its journal:
+sudo systemctl status epikur.service
+journalctl -u epikur.service -f
+```
+
+> **Tip:** Adjust the `-Xmx` heap flag and the JAR path inside `epikur.service`
+> to match your server's available RAM and installation directory before copying.
+
+#### Epikur Systemd Controller (this dashboard — `epikur-systemd-controller.service`)
 
 ```bash
 sudo cp epikur-systemd-controller.service /etc/systemd/system/
@@ -171,7 +201,8 @@ epikur-systemd-controller/
 ├── app.py                            # Flask application
 ├── .env.example                      # Configuration template (copy to .env)
 ├── requirements.txt                  # Python dependencies
-├── epikur-systemd-controller.service # systemd unit for Gunicorn
+├── epikur.service                    # systemd unit for the Epikur Java application
+├── epikur-systemd-controller.service # systemd unit for Gunicorn (this dashboard)
 ├── sudoers.d/
 │   └── epikur                        # sudoers drop-in (copy to /etc/sudoers.d/)
 ├── .gitignore
