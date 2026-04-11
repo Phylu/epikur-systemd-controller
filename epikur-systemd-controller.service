@@ -23,16 +23,15 @@ Group=praxis
 # Absolute path to your project directory (adjust as needed).
 WorkingDirectory=/home/praxis/epikur-systemd-controller
 
-# Default bind settings; override FLASK_HOST and/or FLASK_PORT in .env.
-Environment=FLASK_HOST=0.0.0.0
-Environment=FLASK_PORT=5000
-
 # Load the .env file with EnvironmentFile so secrets never appear in
-# `ps` output or the unit file itself.
+# `ps` output or the unit file itself.  Set FLASK_HOST and FLASK_PORT
+# (and all other configuration) in that file.
 EnvironmentFile=/home/praxis/epikur-systemd-controller/.env
 
-# Gunicorn binds to 0.0.0.0:5000 to serve the dashboard on the local network.
-# Restrict access at the firewall level; do not expose port 5000 externally.
+# Gunicorn binds to 127.0.0.1:5000 by default for local-only access.
+# Override FLASK_HOST in .env (e.g. to an internal IP) when external access is
+# required, and restrict port 5000 at the firewall; never expose it externally
+# without a reverse proxy and TLS.
 ExecStart=/home/praxis/epikur-systemd-controller/venv/bin/gunicorn \
     --workers 2 \
     --bind ${FLASK_HOST}:${FLASK_PORT} \

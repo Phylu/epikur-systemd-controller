@@ -258,7 +258,7 @@
 
     {% for service in services %}
     {% set status = statuses[service] %}
-    {% set display = display_names.get(service, service) %}
+    {% set display = (display_names | default({})).get(service, service) %}
     <div class="card" data-service="{{ service }}">
       <div class="service-name">{{ display }}</div>
 

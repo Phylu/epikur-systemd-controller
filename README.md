@@ -140,9 +140,11 @@ sudo systemctl status epikur-systemd-controller.service
 sudo journalctl -u epikur-systemd-controller.service -f
 ```
 
-Gunicorn starts as the `epikur` user and binds to `0.0.0.0:5000`, making the
-dashboard reachable from any host on the local network at
-`http://<server-ip>:5000`.
+Gunicorn starts as the `praxis` user and binds to `127.0.0.1:5000` by default
+(localhost only). To make the dashboard reachable from other hosts on the local
+network at `http://<server-ip>:5000`, override `FLASK_HOST=0.0.0.0` in your
+`.env` file — and ensure port 5000 is restricted at the firewall. Do **not**
+expose `0.0.0.0:5000` externally without a reverse proxy and TLS.
 
 ---
 

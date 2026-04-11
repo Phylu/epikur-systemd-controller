@@ -36,7 +36,15 @@ ExecStart=/usr/share/epikur4Server/jdk/bin/java --enable-preview --illegal-acces
 
 # Graceful stop: writing "stop" to /tmp/epiCmdFile signals the server to shut
 # down cleanly, matching the behaviour of the original stop.sh wrapper.
-ExecStop=/bin/sh -c 'echo stop > /tmp/epiCmdFile'
+# The '|| true' ensures the unit does not enter a failed state if the write
+# itself fails (e.g. the process is already gone).
+ExecStop=/bin/sh -c 'echo stop > /tmp/epiCmdFile || true'
+
+# Bound the graceful-shutdown window.  After TimeoutStopSec systemd escalates
+# to SIGKILL (KillMode=mixed sends SIGTERM to the main process first, then
+# SIGKILL to any remaining processes in the cgroup after the timeout).
+TimeoutStopSec=30
+KillMode=mixed
 
 # Restart the service automatically when the Java process exits with a
 # non-zero code (crash, OOM kill, etc.).  A clean systemctl stop will NOT

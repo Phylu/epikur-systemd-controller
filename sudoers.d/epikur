@@ -18,7 +18,7 @@
 # --------------
 # * Only the listed services are permitted.  Add one line per service.
 # * NOPASSWD is required because Gunicorn runs non-interactively.
-# * The commands are specified with full paths (/bin/systemctl) to
+# * The commands are specified with full paths (/usr/bin/systemctl) to
 #   prevent PATH-hijacking attacks.
 # * Never use a wildcard (ALL) for the command — that would allow
 #   praxis to start/stop any service on the system.

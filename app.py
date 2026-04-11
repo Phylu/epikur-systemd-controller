@@ -39,6 +39,11 @@ if not app.config["SECRET_KEY"]:
         "FLASK_SECRET_KEY must be set in production. "
         "Please configure it in your .env file before starting the app."
     )
+if "CHANGE_ME" in str(app.config["SECRET_KEY"]):
+    raise RuntimeError(
+        "FLASK_SECRET_KEY must not contain a placeholder value. "
+        "Generate a real key and set it in your .env file before starting the app."
+    )
 
 # Enable CSRF protection globally
 CSRFProtect(app)
@@ -59,6 +64,12 @@ if not _auth_username or not _auth_password:
     raise RuntimeError(
         "BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD must be set. "
         "Please configure them in your .env file before starting the app."
+    )
+_PLACEHOLDER = "CHANGE_ME"
+if _PLACEHOLDER in _auth_username or _PLACEHOLDER in _auth_password:
+    raise RuntimeError(
+        "BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD must not contain placeholder values. "
+        "Set real credentials in your .env file before starting the app."
     )
 
 auth = HTTPBasicAuth()
@@ -123,6 +134,7 @@ def get_service_status(service: str) -> str:
     """
     _validate_service(service)
     try:
+        app.logger.info("AUDIT: systemctl is-active %s", service)
         result = subprocess.run(
             # Explicit list → no shell expansion, no injection risk.
             # Use the full path to systemctl (/usr/bin/systemctl on Debian/Ubuntu)
@@ -151,6 +163,7 @@ def restart_service(service: str) -> bool:
     """
     _validate_service(service)
     try:
+        app.logger.info("AUDIT: systemctl restart %s", service)
         result = subprocess.run(
             ["sudo", "-n", "/usr/bin/systemctl", "restart", service],
             capture_output=True,
