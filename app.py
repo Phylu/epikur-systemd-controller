@@ -13,7 +13,9 @@ Security considerations implemented here:
 
 import os
 import subprocess
-from flask import Flask, render_template_string, redirect, url_for, abort
+import flask
+from flask import Flask, render_template_string, abort, flash, redirect, url_for
+from flask_wtf.csrf import CSRFProtect
 
 # python-dotenv loads variables from a .env file into os.environ so that
 # secrets and configuration never have to be hardcoded in source files.
@@ -22,6 +24,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+
+# CSRF protection: requires a SECRET_KEY from environment or a generated ephemeral key.
+# In production, set FLASK_SECRET_KEY in your .env file to a strong random value.
+# If not set, Flask-WTF will generate an ephemeral key (secure but changes on restart).
+app.config["SECRET_KEY"] = os.environ.get(
+    "FLASK_SECRET_KEY",
+    os.urandom(32).hex() if not os.environ.get("FLASK_ENV") == "production" else None
+)
+if not app.config["SECRET_KEY"]:
+    raise RuntimeError(
+        "FLASK_SECRET_KEY must be set in production. "
+        "Please configure it in your .env file before starting the app."
+    )
+
+# Enable CSRF protection globally
+CSRFProtect(app)
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -61,11 +79,13 @@ def _validate_service(service: str) -> None:
 
 def get_service_status(service: str) -> str:
     """
-    Return 'active' if the service is running, otherwise 'inactive'.
+    Return the raw `systemctl is-active` status string for *service*.
 
-    Uses `systemctl is-active` which exits 0 for active and non-zero for
-    anything else (inactive, failed, unknown …).  No shell=True — the
-    command and its arguments are passed as a list.
+    Typical values include `active`, `inactive`, `activating`,
+    `deactivating`, `failed`, and `unknown`.  On timeout or OS-level
+    execution errors, this function also returns `unknown`.
+
+    No shell=True — the command and its arguments are passed as a list.
     """
     _validate_service(service)
     try:
@@ -73,7 +93,7 @@ def get_service_status(service: str) -> str:
             # Explicit list → no shell expansion, no injection risk.
             # Use the full path to systemctl (/usr/bin/systemctl on Debian/Ubuntu)
             # so that PATH manipulation cannot redirect the command.
-            ["sudo", "/usr/bin/systemctl", "is-active", service],
+            ["sudo", "-n", "/usr/bin/systemctl", "is-active", service],
             capture_output=True,
             text=True,
             timeout=10,  # seconds; prevents the request from hanging forever
@@ -98,7 +118,7 @@ def restart_service(service: str) -> bool:
     _validate_service(service)
     try:
         result = subprocess.run(
-            ["sudo", "/usr/bin/systemctl", "restart", service],
+            ["sudo", "-n", "/usr/bin/systemctl", "restart", service],
             capture_output=True,
             text=True,
             timeout=30,  # restarts can take a few seconds
@@ -227,6 +247,7 @@ DASHBOARD_TEMPLATE = """
           </span>
         </div>
         <form action="{{ url_for('restart', service=service) }}" method="post">
+          {{ csrf_token() }}
           <button type="submit">↺ Restart</button>
         </form>
       </div>
@@ -245,38 +266,10 @@ DASHBOARD_TEMPLATE = """
 def index():
     """Dashboard: show the status of every allowed service."""
     statuses = {svc: get_service_status(svc) for svc in ALLOWED_SERVICES}
-    return render_template_string(
-        DASHBOARD_TEMPLATE,
-        services=ALLOWED_SERVICES,
-        statuses=statuses,
-        message=None,
-        message_type=None,
-    )
-
-
-@app.route("/restart/<service>", methods=["POST"])
-def restart(service: str):
-    """
-    Restart a single service.
-
-    Only POST is accepted to prevent accidental restarts via a bookmarked
-    GET link or a browser pre-fetch.  The service name is validated against
-    ALLOWED_SERVICES inside restart_service() before any system call is made.
-    """
-    # _validate_service is called inside restart_service, but we call it here
-    # first so we can return a clean error page rather than an OS exception.
-    _validate_service(service)
-
-    success = restart_service(service)
-    statuses = {svc: get_service_status(svc) for svc in ALLOWED_SERVICES}
-
-    if success:
-        message = f"Service '{service}' restarted successfully."
-        message_type = "success"
-    else:
-        message = f"Failed to restart '{service}'. Check the system journal for details."
-        message_type = "error"
-
+    # Flask's get_flashed_messages() returns a list; extract the first message if present.
+    messages = list(flask.get_flashed_messages(with_categories=True))
+    message = messages[0][1] if messages else None
+    message_type = messages[0][0] if messages else None
     return render_template_string(
         DASHBOARD_TEMPLATE,
         services=ALLOWED_SERVICES,
@@ -284,6 +277,35 @@ def restart(service: str):
         message=message,
         message_type=message_type,
     )
+
+
+@app.route("/restart/<service>", methods=["POST"])
+def restart(service: str):
+    """
+    Restart a single service using POST/Redirect/GET pattern.
+
+    Only POST is accepted to prevent accidental restarts via a bookmarked
+    GET link or a browser pre-fetch.  The service name is validated against
+    ALLOWED_SERVICES inside restart_service() before any system call is made.
+    
+    After attempting the restart, this route redirects back to the dashboard
+    with a flash message indicating success or failure.  This prevents form
+    resubmission on page refresh.
+    """
+    # _validate_service is called inside restart_service, but we call it here
+    # first so we can return a clean error page rather than an OS exception.
+    _validate_service(service)
+
+    success = restart_service(service)
+
+    if success:
+        message = f"Service '{service}' restarted successfully."
+        flash(message, category="success")
+    else:
+        message = f"Failed to restart '{service}'. Check the system journal for details."
+        flash(message, category="error")
+
+    return redirect(url_for("index"))
 
 
 # ---------------------------------------------------------------------------

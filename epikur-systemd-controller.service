@@ -22,27 +22,19 @@ Group=www-data
 # Absolute path to your project directory (adjust as needed).
 WorkingDirectory=/opt/epikur-systemd-controller
 
+# Default bind settings; override FLASK_HOST and/or FLASK_PORT in .env.
+Environment=FLASK_HOST=0.0.0.0
+Environment=FLASK_PORT=5000
+
 # Load the .env file with EnvironmentFile so secrets never appear in
 # `ps` output or the unit file itself.
 EnvironmentFile=/opt/epikur-systemd-controller/.env
 
-# -------------------------------------------------------------------
-# Bind address — choose ONE of the two options below:
-#
-#   127.0.0.1:5000  (recommended)
-#     Gunicorn only accepts connections from localhost.
-#     Use this when a reverse proxy (e.g. Nginx) sits in front.
-#     The proxy handles TLS and, optionally, HTTP Basic Auth.
-#
-#   0.0.0.0:5000  (direct access, internal networks only)
-#     Gunicorn listens on all interfaces.
-#     Use this ONLY on an isolated, firewalled internal network
-#     where you fully trust every device that can reach this port.
-#     NEVER expose this directly to the public internet.
-# -------------------------------------------------------------------
+# FLASK_HOST defaults to 0.0.0.0 (all interfaces).
+# Set FLASK_HOST=127.0.0.1 in .env if you add a reverse proxy later.
 ExecStart=/opt/epikur-systemd-controller/venv/bin/gunicorn \
     --workers 2 \
-    --bind 127.0.0.1:5000 \
+    --bind ${FLASK_HOST}:${FLASK_PORT} \
     app:app
 
 # Restart the service automatically if it crashes.
