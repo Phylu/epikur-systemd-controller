@@ -6,6 +6,9 @@
 # Web framework
 Flask>=3.0,<4.0
 
+# CSRF protection for Flask forms
+flask-wtf>=1.2,<2.0
+
 # WSGI server for production use (replaces Flask's built-in dev server)
 gunicorn>=22.0,<24.0
 

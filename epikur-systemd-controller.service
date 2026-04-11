@@ -43,8 +43,9 @@ Restart=on-failure
 RestartSec=5s
 
 # Harden the service:
-# Prevent the process from gaining new privileges via setuid/setgid.
-NoNewPrivileges=true
+# NOTE: NoNewPrivileges cannot be used here because the app calls sudo to
+# run systemctl commands. sudo relies on its setuid bit, which NoNewPrivileges
+# would block, causing all status checks and restarts to silently fail.
 # Give the process a private /tmp so it cannot pollute the system temp dir.
 PrivateTmp=true
 

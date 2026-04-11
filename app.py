@@ -247,13 +247,36 @@ DASHBOARD_TEMPLATE = """
           </span>
         </div>
         <form action="{{ url_for('restart', service=service) }}" method="post">
-          {{ csrf_token() }}
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit">↺ Restart</button>
         </form>
       </div>
     {% endfor %}
   </main>
   <footer>epikur-systemd-controller &mdash; internal use only</footer>
+  <script>
+    const BADGE_CLASSES = {
+      active:   'badge-active',
+      inactive: 'badge-inactive',
+      failed:   'badge-inactive',
+    };
+    function refreshStatuses() {
+      fetch('/status')
+        .then(r => r.json())
+        .then(data => {
+          document.querySelectorAll('.card').forEach(card => {
+            const name  = card.querySelector('.service-name').textContent.trim();
+            const badge = card.querySelector('.badge');
+            if (!badge || !(name in data)) return;
+            const status = data[name];
+            badge.textContent = status;
+            badge.className = 'badge ' + (BADGE_CLASSES[status] ?? 'badge-unknown');
+          });
+        })
+        .catch(() => { /* silently ignore transient network errors */ });
+    }
+    setInterval(refreshStatuses, 10000);
+  </script>
 </body>
 </html>
 """
@@ -277,6 +300,12 @@ def index():
         message=message,
         message_type=message_type,
     )
+
+
+@app.route("/status")
+def status():
+    """Return current status of all allowed services as JSON (used by the polling script)."""
+    return flask.jsonify({svc: get_service_status(svc) for svc in ALLOWED_SERVICES})
 
 
 @app.route("/restart/<service>", methods=["POST"])
