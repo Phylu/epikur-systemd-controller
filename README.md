@@ -86,7 +86,7 @@ nano .env
 
 ### 4. Configure sudoers (least-privilege access)
 
-The web process runs as `epikur` and needs passwordless access to two
+The web process runs as `praxis` and needs passwordless access to two
 `systemctl` sub-commands for each allowed service.
 
 ```bash
