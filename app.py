@@ -16,6 +16,8 @@ import subprocess
 import flask
 from flask import Flask, render_template, abort, flash, redirect, url_for
 from flask_wtf.csrf import CSRFProtect
+from flask_httpauth import HTTPBasicAuth
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # python-dotenv loads variables from a .env file into os.environ so that
 # secrets and configuration never have to be hardcoded in source files.
@@ -40,6 +42,38 @@ if not app.config["SECRET_KEY"]:
 
 # Enable CSRF protection globally
 CSRFProtect(app)
+
+# ---------------------------------------------------------------------------
+# HTTP Basic Auth
+# ---------------------------------------------------------------------------
+
+# Credentials are loaded from the .env file.  Example entries:
+#   BASIC_AUTH_USERNAME=admin
+#   BASIC_AUTH_PASSWORD=changeme
+#
+# The password is stored as a Werkzeug password hash at startup so that the
+# plaintext value is not kept in memory after the hash is generated.
+_auth_username = os.environ.get("BASIC_AUTH_USERNAME", "")
+_auth_password = os.environ.get("BASIC_AUTH_PASSWORD", "")
+if not _auth_username or not _auth_password:
+    raise RuntimeError(
+        "BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD must be set. "
+        "Please configure them in your .env file before starting the app."
+    )
+
+auth = HTTPBasicAuth()
+_users = {_auth_username: generate_password_hash(_auth_password)}
+# Clear the plaintext password from the environment after hashing.
+os.environ.pop("BASIC_AUTH_PASSWORD", None)
+
+
+@auth.verify_password
+def verify_password(username: str, password: str) -> bool:
+    hashed = _users.get(username)
+    if hashed and check_password_hash(hashed, password):
+        return True
+    app.logger.warning("Failed Basic Auth attempt for username: %r", username)
+    return False
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -155,6 +189,7 @@ SERVICE_DISPLAY_NAMES = {
 # ---------------------------------------------------------------------------
 
 @app.route("/")
+@auth.login_required
 def index():
     """Dashboard: show the status of every allowed service."""
     statuses = {svc: get_service_status(svc) for svc in ALLOWED_SERVICES}
@@ -172,12 +207,14 @@ def index():
 
 
 @app.route("/status")
+@auth.login_required
 def status():
     """Return current status of all allowed services as JSON (used by the polling script)."""
     return flask.jsonify({svc: get_service_status(svc) for svc in ALLOWED_SERVICES})
 
 
 @app.route("/restart/<service>", methods=["POST"])
+@auth.login_required
 def restart(service: str):
     """
     Restart a single service using POST/Redirect/GET pattern.

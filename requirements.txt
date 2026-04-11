@@ -14,3 +14,6 @@ gunicorn>=22.0,<24.0
 
 # Loads configuration from a .env file into os.environ
 python-dotenv>=1.0,<2.0
+
+# HTTP Basic Auth for Flask routes
+flask-httpauth>=4.8,<5.0
