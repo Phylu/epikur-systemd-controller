@@ -27,17 +27,15 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# CSRF protection: requires a SECRET_KEY from environment or a generated ephemeral key.
-# In production, set FLASK_SECRET_KEY in your .env file to a strong random value.
-# If not set, Flask-WTF will generate an ephemeral key (secure but changes on restart).
-app.config["SECRET_KEY"] = os.environ.get(
-    "FLASK_SECRET_KEY",
-    os.urandom(32).hex() if not os.environ.get("FLASK_ENV") == "production" else None
-)
+# CSRF protection requires a strong, stable SECRET_KEY shared across all
+# Gunicorn workers.  An ephemeral per-worker key would invalidate CSRF tokens
+# on every restart and break requests handled by a different worker.
+# Always set FLASK_SECRET_KEY in your .env file.
+app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY")
 if not app.config["SECRET_KEY"]:
     raise RuntimeError(
-        "FLASK_SECRET_KEY must be set in production. "
-        "Please configure it in your .env file before starting the app."
+        "FLASK_SECRET_KEY must be set. "
+        "Generate a key with: python -c \"import secrets; print(secrets.token_hex(32))\""
     )
 if "CHANGE_ME" in str(app.config["SECRET_KEY"]):
     raise RuntimeError(
@@ -47,6 +45,24 @@ if "CHANGE_ME" in str(app.config["SECRET_KEY"]):
 
 # Enable CSRF protection globally
 CSRFProtect(app)
+
+
+@app.after_request
+def _set_security_headers(response: flask.Response) -> flask.Response:
+    """Apply defensive HTTP headers to every response."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "same-origin"
+    # 'unsafe-inline' is required because the template uses inline <script> and
+    # <style> blocks.  All user-controlled values pass through Jinja2 auto-escaping
+    # so the XSS risk is already mitigated at the template layer.
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "frame-ancestors 'none';"
+    )
+    return response
 
 # ---------------------------------------------------------------------------
 # HTTP Basic Auth
@@ -74,14 +90,22 @@ if _PLACEHOLDER in _auth_username or _PLACEHOLDER in _auth_password:
 
 auth = HTTPBasicAuth()
 _users = {_auth_username: generate_password_hash(_auth_password)}
-# Clear the plaintext password from the environment after hashing.
+# Clear plaintext credentials from the environment after hashing so they are
+# not visible to child processes or inspectable via /proc.
 os.environ.pop("BASIC_AUTH_PASSWORD", None)
+os.environ.pop("BASIC_AUTH_USERNAME", None)
+
+# Dummy hash used to ensure verify_password always calls check_password_hash,
+# preventing username enumeration through response-time differences.
+_DUMMY_HASH = generate_password_hash("dummy-sentinel")
 
 
 @auth.verify_password
 def verify_password(username: str, password: str) -> bool:
-    hashed = _users.get(username)
-    if hashed and check_password_hash(hashed, password):
+    # Always look up a hash (real or dummy) so the response time does not
+    # reveal whether the username exists — constant-time defence.
+    hashed = _users.get(username, _DUMMY_HASH)
+    if check_password_hash(hashed, password) and username in _users:
         return True
     app.logger.warning("Failed Basic Auth attempt for username: %r", username)
     return False

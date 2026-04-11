@@ -34,9 +34,12 @@ doctor's or psychotherapist's office can simply open a browser tab and click
 
 > **Read this section carefully before deploying.**
 
-1. **Restrict to the internal network only.** Gunicorn has no built-in TLS or
-   authentication. Only deploy on a firewalled internal network and never expose
-   this dashboard to the public internet.
+1. **Restrict to the internal network only.** This dashboard uses HTTP Basic
+   Auth over plain HTTP. Basic Auth credentials are base64-encoded, not
+   encrypted — anyone who can observe the network traffic can read them. Only
+   deploy on a firewalled, trusted internal network and never expose this
+   dashboard to the public internet. If you need remote access, put it behind a
+   reverse proxy with TLS (e.g. nginx + Let's Encrypt).
 
 2. **Keep `ALLOWED_SERVICES` minimal.** List only the services you actually need
    to control. Every service you add increases the potential blast radius of a
@@ -44,6 +47,10 @@ doctor's or psychotherapist's office can simply open a browser tab and click
 
 3. **Validate the sudoers file with `visudo -c`** before activating it. A syntax
    error in `/etc/sudoers.d/` can lock you out of `sudo` entirely.
+
+4. **Set strong, unique credentials.** Change `BASIC_AUTH_USERNAME`,
+   `BASIC_AUTH_PASSWORD`, and `FLASK_SECRET_KEY` in `.env` before first start.
+   The app refuses to start if any of these contain placeholder values.
 
 This software is provided **as-is**, without warranty of any kind. The authors
 are not responsible for damage caused by misconfiguration or misuse.

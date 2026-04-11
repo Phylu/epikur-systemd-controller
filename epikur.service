@@ -30,8 +30,18 @@ User=praxis
 # immediately when the launcher returns.
 Type=forking
 
+# NOTE: No PIDFile directive is set here because EpikurWebServerLauncher does
+# not write a PID file.  systemd will track the surviving child process by
+# cgroup membership instead, which is sufficient for Type=forking on modern
+# kernels.  If a future upstream release adds PID-file support, add:
+#   PIDFile=/run/epikur/epikur.pid
+
 WorkingDirectory=/usr/share/epikur4Server
 
+# NOTE: --illegal-access=permit and --enable-preview are configured for the
+# upstream Epikur application and we don't dare to remove them here.
+# This line is taken as is from the epikur provided start.sh script.
+# These flags are set by the vendor and are outside the control of this project.
 ExecStart=/usr/share/epikur4Server/jdk/bin/java --enable-preview --illegal-access=permit --add-opens java.base/java.lang=ALL-UNNAMED -jar lib/EpikurWebServerLauncher.jar start
 
 # Graceful stop: writing "stop" to /tmp/epiCmdFile signals the server to shut
