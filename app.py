@@ -14,7 +14,7 @@ Security considerations implemented here:
 import os
 import subprocess
 import flask
-from flask import Flask, render_template_string, abort, flash, redirect, url_for
+from flask import Flask, render_template, abort, flash, redirect, url_for
 from flask_wtf.csrf import CSRFProtect
 
 # python-dotenv loads variables from a .env file into os.environ so that
@@ -144,142 +144,11 @@ def restart_service(service: str) -> bool:
 # HTML template
 # ---------------------------------------------------------------------------
 
-# The template is kept inline for simplicity (no extra files to deploy).
-# Jinja2 auto-escapes variables in HTML context, which prevents XSS.
-DASHBOARD_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Epikur Systemd Controller</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #f0f2f5;
-      color: #1a1a2e;
-    }
-    header {
-      background: #16213e;
-      color: #e0e0e0;
-      padding: 1rem 2rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    header h1 { margin: 0; font-size: 1.4rem; font-weight: 600; }
-    main { padding: 2rem; max-width: 860px; margin: auto; }
-    .card {
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.08);
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-    .service-name { font-size: 1.1rem; font-weight: 600; }
-    .badge {
-      display: inline-block;
-      padding: .3rem .8rem;
-      border-radius: 999px;
-      font-size: .85rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-    }
-    .badge-active   { background: #d4edda; color: #155724; }
-    .badge-inactive { background: #f8d7da; color: #721c24; }
-    .badge-unknown  { background: #e2e3e5; color: #383d41; }
-    form { margin: 0; }
-    button {
-      background: #0f3460;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: .55rem 1.3rem;
-      font-size: .95rem;
-      cursor: pointer;
-      transition: background .2s;
-    }
-    button:hover { background: #1a5276; }
-    .flash {
-      padding: .8rem 1.2rem;
-      border-radius: 6px;
-      margin-bottom: 1rem;
-      font-weight: 500;
-    }
-    .flash-success { background: #d4edda; color: #155724; }
-    .flash-error   { background: #f8d7da; color: #721c24; }
-    footer {
-      text-align: center;
-      padding: 2rem;
-      font-size: .8rem;
-      color: #888;
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>⚕ Epikur Systemd Controller</h1>
-  </header>
-  <main>
-    {% if message %}
-      <div class="flash flash-{{ message_type }}">{{ message }}</div>
-    {% endif %}
+# Human-readable display names for known services.
+SERVICE_DISPLAY_NAMES = {
+    "epikur.service": "Epikur-Server",
+}
 
-    {% for service in services %}
-      {% set status = statuses[service] %}
-      <div class="card">
-        <div>
-          <div class="service-name">{{ service }}</div>
-          <span class="badge
-            {%- if status == 'active' %} badge-active
-            {%- elif status == 'inactive' or status == 'failed' %} badge-inactive
-            {%- else %} badge-unknown
-            {%- endif %}">
-            {{ status }}
-          </span>
-        </div>
-        <form action="{{ url_for('restart', service=service) }}" method="post">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit">↺ Restart</button>
-        </form>
-      </div>
-    {% endfor %}
-  </main>
-  <footer>epikur-systemd-controller &mdash; internal use only</footer>
-  <script>
-    const BADGE_CLASSES = {
-      active:   'badge-active',
-      inactive: 'badge-inactive',
-      failed:   'badge-inactive',
-    };
-    function refreshStatuses() {
-      fetch('/status')
-        .then(r => r.json())
-        .then(data => {
-          document.querySelectorAll('.card').forEach(card => {
-            const name  = card.querySelector('.service-name').textContent.trim();
-            const badge = card.querySelector('.badge');
-            if (!badge || !(name in data)) return;
-            const status = data[name];
-            badge.textContent = status;
-            badge.className = 'badge ' + (BADGE_CLASSES[status] ?? 'badge-unknown');
-          });
-        })
-        .catch(() => { /* silently ignore transient network errors */ });
-    }
-    setInterval(refreshStatuses, 10000);
-  </script>
-</body>
-</html>
-"""
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -293,10 +162,10 @@ def index():
     messages = list(flask.get_flashed_messages(with_categories=True))
     message = messages[0][1] if messages else None
     message_type = messages[0][0] if messages else None
-    return render_template_string(
-        DASHBOARD_TEMPLATE,
+    return render_template("dashboard.html",
         services=ALLOWED_SERVICES,
         statuses=statuses,
+        display_names=SERVICE_DISPLAY_NAMES,
         message=message,
         message_type=message_type,
     )
@@ -327,12 +196,19 @@ def restart(service: str):
 
     success = restart_service(service)
 
+    display_name = SERVICE_DISPLAY_NAMES.get(service, service)
     if success:
-        message = f"Service '{service}' restarted successfully."
-        flash(message, category="success")
+        flash(
+            f"Der {display_name} wurde erfolgreich neu gestartet. "
+            f"Bitte warte etwa 30 Sekunden, bevor du dich erneut verbindest.",
+            category="success",
+        )
     else:
-        message = f"Failed to restart '{service}'. Check the system journal for details."
-        flash(message, category="error")
+        flash(
+            f"Der {display_name} konnte leider nicht neu gestartet werden. "
+            f"Bitte wende dich an den IT-Administrator der Praxis.",
+            category="error",
+        )
 
     return redirect(url_for("index"))
 

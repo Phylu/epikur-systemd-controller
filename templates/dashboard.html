@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Epikur-Server Verwaltung</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a3a5c;
+      color: #fff;
+      padding: 1.2rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    header .logo {
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: .01em;
+    }
+
+    header .subtitle {
+      margin: .15rem 0 0;
+      font-size: .8rem;
+      opacity: .7;
+      font-weight: 400;
+    }
+
+    main {
+      flex: 1;
+      padding: 2rem;
+      max-width: 700px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .intro {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.75rem;
+      border-left: 4px solid #1a3a5c;
+      font-size: .95rem;
+      color: #444;
+      line-height: 1.6;
+    }
+
+    .intro strong {
+      color: #1a1a2e;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .07);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .service-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 1rem;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      font-size: .95rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-active {
+      background: #28a745;
+      box-shadow: 0 0 0 3px rgba(40, 167, 69, .2);
+    }
+
+    .dot-inactive {
+      background: #dc3545;
+      box-shadow: 0 0 0 3px rgba(220, 53, 69, .2);
+    }
+
+    .dot-unknown {
+      background: #aaa;
+      box-shadow: 0 0 0 3px rgba(170, 170, 170, .2);
+    }
+
+    .dot-transitioning {
+      background: #fd7e14;
+      box-shadow: 0 0 0 3px rgba(253, 126, 20, .2);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .4;
+      }
+    }
+
+    .status-text-transitioning {
+      color: #854500;
+      font-weight: 600;
+    }
+
+    .status-text-active {
+      color: #155724;
+      font-weight: 600;
+    }
+
+    .status-text-inactive {
+      color: #721c24;
+      font-weight: 600;
+    }
+
+    .status-text-unknown {
+      color: #555;
+      font-weight: 600;
+    }
+
+    .card-hint {
+      font-size: .85rem;
+      color: #777;
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+    }
+
+    button {
+      background: #1a3a5c;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: .65rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .18s, transform .1s;
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    button:hover {
+      background: #244e80;
+    }
+
+    button:active {
+      transform: scale(.97);
+    }
+
+    .flash {
+      display: flex;
+      align-items: flex-start;
+      gap: .75rem;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-size: .95rem;
+      line-height: 1.5;
+    }
+
+    .flash-icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .flash-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .flash-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .refresh-hint {
+      font-size: .8rem;
+      color: #aaa;
+      text-align: right;
+      margin-top: -.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .refresh-hint span {
+      font-weight: 600;
+      color: #888;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem 2rem;
+      font-size: .78rem;
+      color: #bbb;
+      border-top: 1px solid #e8eaf0;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="logo">&#9877;</div>
+    <div>
+      <h1>Epikur-Server Verwaltung</h1>
+      <div class="subtitle">Die schnelle Kur bei Epikur-Problemen</div>
+    </div>
+  </header>
+
+  <main>
+    {% if message %}
+    <div class="flash flash-{{ message_type }}">
+      <span class="flash-icon">{% if message_type == 'success' %}&#10004;{% else %}&#9888;{% endif %}</span>
+      <span>{{ message }}</span>
+    </div>
+    {% endif %}
+
+    <div class="refresh-hint">Status Aktualisierung in <span id="countdown">10</span>&nbsp;s</div>
+
+    {% for service in services %}
+    {% set status = statuses[service] %}
+    {% set display = display_names.get(service, service) %}
+    <div class="card" data-service="{{ service }}">
+      <div class="service-name">{{ display }}</div>
+
+      <div class="status-row">
+        <span class="dot
+            {%- if status == 'active' %} dot-active
+            {%- elif status in ('inactive', 'failed') %} dot-inactive
+            {%- elif status in ('activating', 'deactivating', 'reloading') %} dot-transitioning
+            {%- else %} dot-unknown{% endif %}"></span>
+        <span class="status-label status-text-
+            {%- if status == 'active' %}active">L&auml;uft &ndash; bereit f&uuml;r Verbindungen
+          {%- elif status == 'failed' %}inactive">Fehler &ndash; Server konnte nicht gestartet werden
+          {%- elif status == 'inactive' %}inactive">Gestoppt &ndash; aktuell nicht erreichbar
+          {%- elif status == 'activating' %}transitioning">Startet gerade &hellip;
+          {%- elif status == 'deactivating' %}transitioning">F&auml;hrt herunter &hellip;
+          {%- elif status == 'reloading' %}transitioning">L&auml;dt neu &hellip;
+          {%- else %}unknown">Status unbekannt{% endif %}
+        </span>
+      </div>
+
+      <div class="card-hint">
+        Wenn sich Epikur nicht &ouml;ffnen l&auml;sst oder keine Verbindung m&ouml;glich ist,
+        starte den Server bitte mit dem Knopf unten neu.
+        Der Neustart dauert etwa 15&ndash;30 Sekunden.
+      </div>
+
+      <form action="{{ url_for('restart', service=service) }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">&#8635; Server neu starten</button>
+      </form>
+    </div>
+    {% endfor %}
+  </main>
+
+  <footer>Die schnelle Kur bei Epikur-Problemen</footer>
+
+  <script>
+    const STATUS_LABELS = {
+      active: { css: 'active', text: 'L\u00e4uft \u2013 bereit f\u00fcr Verbindungen' },
+      inactive: { css: 'inactive', text: 'Gestoppt \u2013 aktuell nicht erreichbar' },
+      failed: { css: 'inactive', text: 'Fehler \u2013 Server konnte nicht gestartet werden' },
+      activating: { css: 'transitioning', text: 'Startet gerade \u2026' },
+      deactivating: { css: 'transitioning', text: 'F\u00e4hrt herunter \u2026' },
+      reloading: { css: 'transitioning', text: 'L\u00e4dt neu \u2026' },
+    };
+    const DEFAULT_STATUS = { css: 'unknown', text: 'Status unbekannt' };
+
+    function applyStatus(card, rawStatus) {
+      const s = STATUS_LABELS[rawStatus] ?? DEFAULT_STATUS;
+      const dot = card.querySelector('.dot');
+      const label = card.querySelector('.status-label');
+      dot.className = 'dot dot-' + s.css;
+      label.className = 'status-label status-text-' + s.css;
+      label.textContent = s.text;
+    }
+
+    let secondsLeft = 10;
+    const countdownEl = document.getElementById('countdown');
+    setInterval(() => {
+      secondsLeft = secondsLeft <= 1 ? 10 : secondsLeft - 1;
+      countdownEl.textContent = secondsLeft;
+    }, 1000);
+
+    function refreshStatuses() {
+      secondsLeft = 10;
+      fetch('/status')
+        .then(r => r.json())
+        .then(data => {
+          document.querySelectorAll('.card[data-service]').forEach(card => {
+            const svc = card.dataset.service;
+            if (svc in data) applyStatus(card, data[svc]);
+          });
+        })
+        .catch(() => { /* silently ignore transient network errors */ });
+    }
+    setInterval(refreshStatuses, 10000);
+  </script>
+</body>
+
+</html>
