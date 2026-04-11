@@ -1,0 +1,65 @@
+# /etc/systemd/system/epikur.service
+#
+# Systemd unit file for the Epikur Java application.
+#
+# This unit starts the Epikur JAR directly with the Java binary so that
+# systemd can natively track the process PID, capture all output into the
+# system journal via journald, and handle graceful restarts on failure.
+# The old wrapper scripts (start.sh / stop.sh) are no longer needed.
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/
+#   2. Adjust the paths and memory flags below to match your installation.
+#   3. Run:
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now epikur.service
+
+[Unit]
+Description=Epikur Practice Management — Java application
+# Start after the network stack is initialized. Epikur connects to a local DB,
+# and using network.target keeps startup ordering consistent with other
+# services such as postgresql.service or mariadb.service without requiring
+# confirmed network connectivity.
+After=network.target
+
+[Service]
+# Run as the dedicated, unprivileged 'epikur' system account.
+# Create it once with:
+#   sudo useradd --system --no-create-home --shell /bin/false epikur
+# (/bin/false is portable across distributions; use /usr/sbin/nologin or
+#  /usr/bin/nologin on systems where those exist and are preferred.)
+User=epikur
+
+# 'simple' means systemd considers the service started as soon as ExecStart
+# launches the process.  This is correct for a foreground Java application
+# because the JVM does not fork.
+Type=simple
+
+# Working directory — the JAR is resolved relative to this path and any
+# relative file references inside Epikur will anchor here.
+WorkingDirectory=/opt/epikur
+
+# Start Epikur directly via the Java binary.  Adjust the heap size (-Xmx)
+# and the JAR path to match your installation.
+#
+# -Xmx1G  — maximum heap; tune to available RAM (e.g. -Xmx2G on larger hosts)
+# -jar     — run the specified JAR as an executable application
+ExecStart=/usr/bin/java -Xmx1G -jar /opt/epikur/epikur.jar
+
+# Restart the service automatically when the Java process exits with a
+# non-zero code (crash, OOM kill, etc.).  A clean systemctl stop will NOT
+# trigger a restart.
+Restart=on-failure
+RestartSec=10s
+
+# Hardening — prevent the process from gaining new privileges via setuid/setgid.
+NoNewPrivileges=true
+# Give the process a private /tmp so it cannot pollute the system temp dir.
+PrivateTmp=true
+
+# journald captures stdout and stderr automatically for Type=simple services,
+# so no explicit StandardOutput/StandardError directives are required.
+# Use `journalctl -u epikur.service -f` to follow the live log.
+
+[Install]
+WantedBy=multi-user.target
