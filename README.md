@@ -1,9 +1,9 @@
 # epikur-systemd-controller
 
 A lightweight, Flask-based web dashboard for monitoring and restarting specific
-systemd services directly from a browser.  It was built to solve the problem of
+systemd services directly from a browser. It was built to solve the problem of
 **Epikur** (a German practice-management software) randomly crashing on headless
-Linux servers, where the normal Java-GUI restart path is unavailable.  Staff in a
+Linux servers, where the normal Java-GUI restart path is unavailable. Staff in a
 doctor's or psychotherapist's office can simply open a browser tab and click
 **Restart** without needing SSH or remote-desktop access.
 
@@ -13,19 +13,20 @@ doctor's or psychotherapist's office can simply open a browser tab and click
 
 - **Live status** — displays `active` / `inactive` / `failed` for every
   configured service, refreshed on each page load.
-- **One-click restart** — POST-only form submission prevents accidental
-  restarts from bookmarks or browser pre-fetch.
-- **Allowlist validation** — only services explicitly listed in `ALLOWED_SERVICES`
-  can be queried or restarted; all other requests are rejected with HTTP 403.
+- **One-click restart** — POST-only form submission prevents accidental restarts
+  from bookmarks or browser pre-fetch.
+- **Allowlist validation** — only services explicitly listed in
+  `ALLOWED_SERVICES` can be queried or restarted; all other requests are
+  rejected with HTTP 403.
 - **No `shell=True`** — all `subprocess` calls use argument lists to eliminate
   shell-injection risk.
 - **Configuration via `.env`** — service names are never hardcoded in the
   application logic.
 - **Least-privilege sudoers** — the web process only gains the right to run
-  `systemctl is-active` and `systemctl restart` for the specific services
-  you configure.
-- **Served by Gunicorn** — production-grade WSGI server with a systemd unit
-  file included.
+  `systemctl is-active` and `systemctl restart` for the specific services you
+  configure.
+- **Served by Gunicorn** — production-grade WSGI server with a systemd unit file
+  included.
 
 ---
 
@@ -33,29 +34,18 @@ doctor's or psychotherapist's office can simply open a browser tab and click
 
 > **Read this section carefully before deploying.**
 
-1. **Do not expose this tool directly to the public internet.**
-   Gunicorn has no built-in TLS or authentication.  Without a reverse proxy
-   (e.g. Nginx with HTTPS and HTTP Basic Auth), anyone who can reach the port
-   can restart your services.
+1. **Restrict to the internal network only.** Gunicorn has no built-in TLS or
+   authentication. Only deploy on a firewalled internal network and never expose
+   this dashboard to the public internet.
 
-2. **Use a reverse proxy with authentication.**
-   Put Nginx (or Caddy/Apache) in front of Gunicorn, terminate TLS there, and
-   add at minimum HTTP Basic Auth to restrict access.
+2. **Keep `ALLOWED_SERVICES` minimal.** List only the services you actually need
+   to control. Every service you add increases the potential blast radius of a
+   compromised dashboard.
 
-3. **Bind to `127.0.0.1` (default).**
-   The included systemd unit file binds Gunicorn to `127.0.0.1:5000` so it is
-   only reachable from the same machine.  The reverse proxy then forwards
-   traffic to it.  Only change to `0.0.0.0` if you are on a fully isolated,
-   firewalled internal network and accept the risk.
+3. **Validate the sudoers file with `visudo -c`** before activating it. A syntax
+   error in `/etc/sudoers.d/` can lock you out of `sudo` entirely.
 
-4. **Keep `ALLOWED_SERVICES` minimal.**
-   List only the services you actually need to control.  Every service you add
-   increases the potential blast radius of a compromised dashboard.
-
-5. **Validate the sudoers file with `visudo -c`** before activating it.
-   A syntax error in `/etc/sudoers.d/` can lock you out of `sudo` entirely.
-
-This software is provided **as-is**, without warranty of any kind.  The authors
+This software is provided **as-is**, without warranty of any kind. The authors
 are not responsible for damage caused by misconfiguration or misuse.
 
 ---
@@ -96,7 +86,7 @@ nano .env
 
 ### 4. Configure sudoers (least-privilege access)
 
-The web process runs as `www-data` and needs passwordless access to two
+The web process runs as `epikur` and needs passwordless access to two
 `systemctl` sub-commands for each allowed service.
 
 ```bash
@@ -116,9 +106,12 @@ sudo visudo -c -f /etc/sudoers.d/epikur
 ### 5. Deploy the application files
 
 ```bash
-sudo mkdir -p /opt/epikur-systemd-controller
-sudo cp -r . /opt/epikur-systemd-controller/
-sudo chown -R www-data:www-data /opt/epikur-systemd-controller
+# Create the service account with its home directory (once):
+sudo useradd --system --create-home --home-dir /home/epikur --shell /bin/false epikur
+# (/bin/false is portable; use /usr/sbin/nologin or /usr/bin/nologin where preferred)
+
+sudo cp -r . /home/epikur/epikur-systemd-controller/
+sudo chown -R epikur:epikur /home/epikur/epikur-systemd-controller
 ```
 
 ### 6. Install and start the systemd services
@@ -129,9 +122,7 @@ sudo chown -R www-data:www-data /opt/epikur-systemd-controller
 systemd can track the PID natively and capture all output in the journal.
 
 ```bash
-# Create the dedicated service account (once):
-sudo useradd --system --no-create-home --shell /bin/false epikur
-# (/bin/false is portable; use /usr/sbin/nologin or /usr/bin/nologin where preferred)
+# The epikur service account was already created in step 5.
 
 # Deploy the application files and set ownership:
 sudo mkdir -p /opt/epikur
@@ -149,7 +140,8 @@ sudo journalctl -u epikur.service -f
 ```
 
 > **Tip:** Adjust the `-Xmx` heap flag and the JAR path inside `epikur.service`
-> to match your server's available RAM and installation directory before copying.
+> to match your server's available RAM and installation directory before
+> copying.
 
 #### Epikur Systemd Controller (this dashboard — `epikur-systemd-controller.service`)
 
@@ -158,39 +150,14 @@ sudo cp epikur-systemd-controller.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now epikur-systemd-controller.service
 
-# Verify it is running
+# Verify it is running and follow its journal:
 sudo systemctl status epikur-systemd-controller.service
+sudo journalctl -u epikur-systemd-controller.service -f
 ```
 
-### 7. (Recommended) Set up a reverse proxy with Nginx
-
-```nginx
-server {
-    listen 80;
-    server_name controller.example.internal;
-
-    # Redirect plain HTTP to HTTPS
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name controller.example.internal;
-
-    ssl_certificate     /etc/ssl/certs/your-cert.pem;
-    ssl_certificate_key /etc/ssl/private/your-key.pem;
-
-    # Require HTTP Basic Auth
-    auth_basic           "Epikur Controller";
-    auth_basic_user_file /etc/nginx/.htpasswd;
-
-    location / {
-        proxy_pass         http://127.0.0.1:5000;
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-    }
-}
-```
+Gunicorn starts as the `epikur` user and binds to `0.0.0.0:5000`, making the
+dashboard reachable from any host on the local network at
+`http://<server-ip>:5000`.
 
 ---
 
