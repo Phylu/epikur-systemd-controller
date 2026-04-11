@@ -16,9 +16,10 @@
 
 [Unit]
 Description=Epikur Practice Management — Java application
-# Only start after the network is available (Epikur connects to a local DB,
-# but delaying until network.target keeps ordering consistent with other
-# services such as postgresql.service or mariadb.service).
+# Start after the network stack is initialized. Epikur connects to a local DB,
+# and using network.target keeps startup ordering consistent with other
+# services such as postgresql.service or mariadb.service without requiring
+# confirmed network connectivity.
 After=network.target
 
 [Service]
@@ -28,7 +29,6 @@ After=network.target
 # (/bin/false is portable across distributions; use /usr/sbin/nologin or
 #  /usr/bin/nologin on systems where those exist and are preferred.)
 User=epikur
-Group=epikur
 
 # 'simple' means systemd considers the service started as soon as ExecStart
 # launches the process.  This is correct for a foreground Java application

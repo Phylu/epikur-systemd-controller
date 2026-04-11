@@ -145,7 +145,7 @@ sudo systemctl enable --now epikur.service
 
 # Verify it is running and follow its journal:
 sudo systemctl status epikur.service
-journalctl -u epikur.service -f
+sudo journalctl -u epikur.service -f
 ```
 
 > **Tip:** Adjust the `-Xmx` heap flag and the JAR path inside `epikur.service`
