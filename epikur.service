@@ -9,8 +9,7 @@
 #
 # Installation:
 #   1. Copy this file to /etc/systemd/system/
-#   2. Adjust the paths and memory flags below to match your installation.
-#   3. Run:
+#   2. Run:
 #        sudo systemctl daemon-reload
 #        sudo systemctl enable --now epikur.service
 
@@ -23,28 +22,21 @@ Description=Epikur Practice Management — Java application
 After=network.target
 
 [Service]
-# Run as the dedicated, unprivileged 'epikur' system account.
-# Create it once with:
-#   sudo useradd --system --no-create-home --shell /bin/false epikur
-# (/bin/false is portable across distributions; use /usr/sbin/nologin or
-#  /usr/bin/nologin on systems where those exist and are preferred.)
-User=epikur
+User=praxis
 
-# 'simple' means systemd considers the service started as soon as ExecStart
-# launches the process.  This is correct for a foreground Java application
-# because the JVM does not fork.
-Type=simple
+# 'forking' tells systemd to wait for the launcher process to exit and then
+# track the surviving child process.  EpikurWebServerLauncher forks the real
+# server JVM and exits, so 'simple' would cause systemd to kill the child
+# immediately when the launcher returns.
+Type=forking
 
-# Working directory — the JAR is resolved relative to this path and any
-# relative file references inside Epikur will anchor here.
-WorkingDirectory=/opt/epikur
+WorkingDirectory=/usr/share/epikur4Server
 
-# Start Epikur directly via the Java binary.  Adjust the heap size (-Xmx)
-# and the JAR path to match your installation.
-#
-# -Xmx1G  — maximum heap; tune to available RAM (e.g. -Xmx2G on larger hosts)
-# -jar     — run the specified JAR as an executable application
-ExecStart=/usr/bin/java -Xmx1G -jar /opt/epikur/epikur.jar
+ExecStart=/usr/share/epikur4Server/jdk/bin/java --enable-preview --illegal-access=permit --add-opens java.base/java.lang=ALL-UNNAMED -jar lib/EpikurWebServerLauncher.jar start
+
+# Graceful stop: writing "stop" to /tmp/epiCmdFile signals the server to shut
+# down cleanly, matching the behaviour of the original stop.sh wrapper.
+ExecStop=/bin/sh -c 'echo stop > /tmp/epiCmdFile'
 
 # Restart the service automatically when the Java process exits with a
 # non-zero code (crash, OOM kill, etc.).  A clean systemctl stop will NOT
@@ -54,8 +46,6 @@ RestartSec=10s
 
 # Hardening — prevent the process from gaining new privileges via setuid/setgid.
 NoNewPrivileges=true
-# Give the process a private /tmp so it cannot pollute the system temp dir.
-PrivateTmp=true
 
 # journald captures stdout and stderr automatically for Type=simple services,
 # so no explicit StandardOutput/StandardError directives are required.

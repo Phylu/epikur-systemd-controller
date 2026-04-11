@@ -15,13 +15,13 @@ Description=Epikur Systemd Controller — Flask/Gunicorn web dashboard
 After=network.target
 
 [Service]
-# Run as the epikur service account so the sudoers rule in sudoers.d/epikur applies
-# and all application files stay under the epikur home directory.
-User=epikur
-Group=epikur
+# Run as the praxis service account so the sudoers rule in sudoers.d/epikur applies
+# and all application files stay under the praxis home directory.
+User=praxis
+Group=praxis
 
 # Absolute path to your project directory (adjust as needed).
-WorkingDirectory=/home/epikur/epikur-systemd-controller
+WorkingDirectory=/home/praxis/epikur-systemd-controller
 
 # Default bind settings; override FLASK_HOST and/or FLASK_PORT in .env.
 Environment=FLASK_HOST=0.0.0.0
@@ -29,11 +29,11 @@ Environment=FLASK_PORT=5000
 
 # Load the .env file with EnvironmentFile so secrets never appear in
 # `ps` output or the unit file itself.
-EnvironmentFile=/home/epikur/epikur-systemd-controller/.env
+EnvironmentFile=/home/praxis/epikur-systemd-controller/.env
 
 # Gunicorn binds to 0.0.0.0:5000 to serve the dashboard on the local network.
 # Restrict access at the firewall level; do not expose port 5000 externally.
-ExecStart=/home/epikur/epikur-systemd-controller/venv/bin/gunicorn \
+ExecStart=/home/praxis/epikur-systemd-controller/venv/bin/gunicorn \
     --workers 2 \
     --bind ${FLASK_HOST}:${FLASK_PORT} \
     app:app

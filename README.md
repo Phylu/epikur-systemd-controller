@@ -106,12 +106,8 @@ sudo visudo -c -f /etc/sudoers.d/epikur
 ### 5. Deploy the application files
 
 ```bash
-# Create the service account with its home directory (once):
-sudo useradd --system --create-home --home-dir /home/epikur --shell /bin/false epikur
-# (/bin/false is portable; use /usr/sbin/nologin or /usr/bin/nologin where preferred)
-
-sudo cp -r . /home/epikur/epikur-systemd-controller/
-sudo chown -R epikur:epikur /home/epikur/epikur-systemd-controller
+sudo cp -r . /home/praxis/epikur-systemd-controller/
+sudo chown -R praxis:praxis /home/praxis/epikur-systemd-controller
 ```
 
 ### 6. Install and start the systemd services
@@ -122,13 +118,6 @@ sudo chown -R epikur:epikur /home/epikur/epikur-systemd-controller
 systemd can track the PID natively and capture all output in the journal.
 
 ```bash
-# The epikur service account was already created in step 5.
-
-# Deploy the application files and set ownership:
-sudo mkdir -p /opt/epikur
-sudo cp /path/to/epikur.jar /opt/epikur/epikur.jar
-sudo chown -R epikur:epikur /opt/epikur
-
 # Install and enable the service:
 sudo cp epikur.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -138,10 +127,6 @@ sudo systemctl enable --now epikur.service
 sudo systemctl status epikur.service
 sudo journalctl -u epikur.service -f
 ```
-
-> **Tip:** Adjust the `-Xmx` heap flag and the JAR path inside `epikur.service`
-> to match your server's available RAM and installation directory before
-> copying.
 
 #### Epikur Systemd Controller (this dashboard — `epikur-systemd-controller.service`)
 

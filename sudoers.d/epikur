@@ -2,7 +2,7 @@
 #
 # PURPOSE
 # -------
-# Allows the epikur user (under which Gunicorn runs) to execute
+# Allows the praxis user (under which Gunicorn runs) to execute
 # ONLY the two systemctl commands needed by epikur-systemd-controller,
 # without a password prompt.
 #
@@ -21,7 +21,7 @@
 # * The commands are specified with full paths (/bin/systemctl) to
 #   prevent PATH-hijacking attacks.
 # * Never use a wildcard (ALL) for the command — that would allow
-#   epikur to start/stop any service on the system.
+#   praxis to start/stop any service on the system.
 #
 # Syntax:
 #   <user>  ALL=(root) NOPASSWD: <full-path-to-command> <fixed-arguments>
@@ -37,11 +37,11 @@
 # the command even though the rule appears to match.
 
 # Allow status checks for epikur.service
-epikur  ALL=(root) NOPASSWD: /usr/bin/systemctl is-active epikur.service
+praxis  ALL=(root) NOPASSWD: /usr/bin/systemctl is-active epikur.service
 
 # Allow restart for epikur.service
-epikur  ALL=(root) NOPASSWD: /usr/bin/systemctl restart epikur.service
+praxis  ALL=(root) NOPASSWD: /usr/bin/systemctl restart epikur.service
 
 # If you manage additional services, add pairs of lines for each, e.g.:
-# epikur  ALL=(root) NOPASSWD: /usr/bin/systemctl is-active nginx.service
-# epikur  ALL=(root) NOPASSWD: /usr/bin/systemctl restart nginx.service
+# praxis  ALL=(root) NOPASSWD: /usr/bin/systemctl is-active nginx.service
+# praxis  ALL=(root) NOPASSWD: /usr/bin/systemctl restart nginx.service
