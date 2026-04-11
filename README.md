@@ -1,5 +1,7 @@
 # epikur-systemd-controller
 
+![epikur-systemd-controller dashboard](epikur-systemd-controller.png)
+
 A lightweight, Flask-based web dashboard for monitoring and restarting specific
 systemd services directly from a browser. It was built to solve the problem of
 **Epikur** (a German practice-management software) randomly crashing on headless
