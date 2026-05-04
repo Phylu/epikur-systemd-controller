@@ -1,0 +1,73 @@
+# /etc/systemd/system/epikur.service
+#
+# Systemd unit file for the Epikur Java application.
+#
+# This unit starts the Epikur JAR directly with the Java binary so that
+# systemd can natively track the process PID, capture all output into the
+# system journal via journald, and handle graceful restarts on failure.
+# The old wrapper scripts (start.sh / stop.sh) are no longer needed.
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/
+#   2. Run:
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now epikur.service
+
+[Unit]
+Description=Epikur Practice Management — Java application
+# Start after the network stack is initialized. Epikur connects to a local DB,
+# and using network.target keeps startup ordering consistent with other
+# services such as postgresql.service or mariadb.service without requiring
+# confirmed network connectivity.
+After=network.target
+
+[Service]
+User=praxis
+
+# 'forking' tells systemd to wait for the launcher process to exit and then
+# track the surviving child process.  EpikurWebServerLauncher forks the real
+# server JVM and exits, so 'simple' would cause systemd to kill the child
+# immediately when the launcher returns.
+Type=forking
+
+# NOTE: No PIDFile directive is set here because EpikurWebServerLauncher does
+# not write a PID file.  systemd will track the surviving child process by
+# cgroup membership instead, which is sufficient for Type=forking on modern
+# kernels.  If a future upstream release adds PID-file support, add:
+#   PIDFile=/run/epikur/epikur.pid
+
+WorkingDirectory=/usr/share/epikur4Server
+
+# NOTE: --illegal-access=permit and --enable-preview are configured for the
+# upstream Epikur application and we don't dare to remove them here.
+# This line is taken as is from the epikur provided start.sh script.
+# These flags are set by the vendor and are outside the control of this project.
+ExecStart=/usr/share/epikur4Server/jdk/bin/java --enable-preview --illegal-access=permit --add-opens java.base/java.lang=ALL-UNNAMED -jar lib/EpikurWebServerLauncher.jar start
+
+# Graceful stop: writing "stop" to /tmp/epiCmdFile signals the server to shut
+# down cleanly, matching the behaviour of the original stop.sh wrapper.
+# The '|| true' ensures the unit does not enter a failed state if the write
+# itself fails (e.g. the process is already gone).
+ExecStop=/bin/sh -c 'echo stop > /tmp/epiCmdFile || true'
+
+# Bound the graceful-shutdown window.  After TimeoutStopSec systemd escalates
+# to SIGKILL (KillMode=mixed sends SIGTERM to the main process first, then
+# SIGKILL to any remaining processes in the cgroup after the timeout).
+TimeoutStopSec=30
+KillMode=mixed
+
+# Restart the service automatically when the Java process exits with a
+# non-zero code (crash, OOM kill, etc.).  A clean systemctl stop will NOT
+# trigger a restart.
+Restart=on-failure
+RestartSec=10s
+
+# Hardening — prevent the process from gaining new privileges via setuid/setgid.
+NoNewPrivileges=true
+
+# journald captures stdout and stderr automatically for Type=simple services,
+# so no explicit StandardOutput/StandardError directives are required.
+# Use `journalctl -u epikur.service -f` to follow the live log.
+
+[Install]
+WantedBy=multi-user.target

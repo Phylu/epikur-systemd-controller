@@ -1,0 +1,52 @@
+# /etc/systemd/system/epikur-systemd-controller.service
+#
+# Systemd unit file for the epikur-systemd-controller Gunicorn server.
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/
+#   2. Adjust the paths below to match your installation directory.
+#   3. Run:
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now epikur-systemd-controller.service
+
+[Unit]
+Description=Epikur Systemd Controller — Flask/Gunicorn web dashboard
+# Require the network stack to be up before starting.
+After=network.target
+
+[Service]
+# Run as the praxis service account so the sudoers rule in sudoers.d/epikur applies
+# and all application files stay under the praxis home directory.
+User=praxis
+Group=praxis
+
+# Absolute path to your project directory (adjust as needed).
+WorkingDirectory=/home/praxis/epikur-systemd-controller
+
+# Load the .env file with EnvironmentFile so secrets never appear in
+# `ps` output or the unit file itself.  Set FLASK_HOST and FLASK_PORT
+# (and all other configuration) in that file.
+EnvironmentFile=/home/praxis/epikur-systemd-controller/.env
+
+# Gunicorn binds to 127.0.0.1:5000 by default for local-only access.
+# Override FLASK_HOST in .env (e.g. to an internal IP) when external access is
+# required, and restrict port 5000 at the firewall; never expose it externally
+# without a reverse proxy and TLS.
+ExecStart=/home/praxis/epikur-systemd-controller/venv/bin/gunicorn \
+    --workers 2 \
+    --bind ${FLASK_HOST}:${FLASK_PORT} \
+    app:app
+
+# Restart the service automatically if it crashes.
+Restart=on-failure
+RestartSec=5s
+
+# Harden the service:
+# NOTE: NoNewPrivileges cannot be used here because the app calls sudo to
+# run systemctl commands. sudo relies on its setuid bit, which NoNewPrivileges
+# would block, causing all status checks and restarts to silently fail.
+# Give the process a private /tmp so it cannot pollute the system temp dir.
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
