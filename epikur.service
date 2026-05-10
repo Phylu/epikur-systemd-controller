@@ -56,10 +56,19 @@ ExecStop=/bin/sh -c 'echo stop > /tmp/epiCmdFile || true'
 TimeoutStopSec=30
 KillMode=mixed
 
+# Epikur's JVM commonly exits with status 143 (128 + SIGTERM) during an
+# intentional `systemctl stop`.  Treat this as a successful stop so the unit
+# transitions to `inactive` instead of `failed`.
+SuccessExitStatus=143 SIGTERM
+
 # Restart the service automatically when the Java process exits with a
 # non-zero code (crash, OOM kill, etc.).  A clean systemctl stop will NOT
 # trigger a restart.
 Restart=on-failure
+# Keep unexpected 143 exits recoverable: while `SuccessExitStatus` prevents a
+# manual stop from being marked failed, this forces automatic restart if 143
+# occurs outside an explicit stop job.
+RestartForceExitStatus=143 SIGTERM
 RestartSec=10s
 
 # Hardening — prevent the process from gaining new privileges via setuid/setgid.

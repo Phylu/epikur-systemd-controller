@@ -194,11 +194,26 @@ def restart_service(service: str) -> bool:
             text=True,
             timeout=30,  # restarts can take a few seconds
         )
-        success = result.returncode == 0
+        if result.returncode != 0:
+            app.logger.warning(
+                "Restart of %s returned rc=%d (stop phase may have failed because "
+                "service was already stopped): %s",
+                service,
+                result.returncode,
+                result.stderr.strip(),
+            )
+        # The stop phase of `systemctl restart` can fail with a non-zero exit code
+        # when the service was already stopped, even though the subsequent start
+        # succeeded.  Reuse get_service_status() so validation, timeout handling,
+        # and audit logging stay in one place and cannot diverge.
+        active_state = get_service_status(service)
+        success = active_state == "active"
         if not success:
             app.logger.error(
-                "Restart of %s failed (rc=%d): %s",
+                "Restart of %s failed: service is not active after restart "
+                "(state=%r, restart_rc=%d, restart_stderr=%r)",
                 service,
+                active_state,
                 result.returncode,
                 result.stderr.strip(),
             )
