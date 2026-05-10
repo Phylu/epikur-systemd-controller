@@ -194,13 +194,30 @@ def restart_service(service: str) -> bool:
             text=True,
             timeout=30,  # restarts can take a few seconds
         )
-        success = result.returncode == 0
-        if not success:
-            app.logger.error(
-                "Restart of %s failed (rc=%d): %s",
+        if result.returncode != 0:
+            app.logger.warning(
+                "Restart of %s returned rc=%d (stop phase may have failed because "
+                "service was already stopped): %s",
                 service,
                 result.returncode,
                 result.stderr.strip(),
+            )
+        # The stop phase of `systemctl restart` can fail with a non-zero exit code
+        # when the service was already stopped, even though the subsequent start
+        # succeeded.  Check the actual running state to determine real success.
+        active_result = subprocess.run(
+            ["sudo", "-n", "/usr/bin/systemctl", "is-active", service],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        success = active_result.stdout.strip() == "active"
+        if not success:
+            app.logger.error(
+                "Restart of %s failed: service is not active after restart (state=%r, rc=%d)",
+                service,
+                active_result.stdout.strip(),
+                result.returncode,
             )
         return success
     except subprocess.TimeoutExpired:
