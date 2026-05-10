@@ -204,20 +204,18 @@ def restart_service(service: str) -> bool:
             )
         # The stop phase of `systemctl restart` can fail with a non-zero exit code
         # when the service was already stopped, even though the subsequent start
-        # succeeded.  Check the actual running state to determine real success.
-        active_result = subprocess.run(
-            ["sudo", "-n", "/usr/bin/systemctl", "is-active", service],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        success = active_result.stdout.strip() == "active"
+        # succeeded.  Reuse get_service_status() so validation, timeout handling,
+        # and audit logging stay in one place and cannot diverge.
+        active_state = get_service_status(service)
+        success = active_state == "active"
         if not success:
             app.logger.error(
-                "Restart of %s failed: service is not active after restart (state=%r, rc=%d)",
+                "Restart of %s failed: service is not active after restart "
+                "(state=%r, restart_rc=%d, restart_stderr=%r)",
                 service,
-                active_result.stdout.strip(),
+                active_state,
                 result.returncode,
+                result.stderr.strip(),
             )
         return success
     except subprocess.TimeoutExpired:
